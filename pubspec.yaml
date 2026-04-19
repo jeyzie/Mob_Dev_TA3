@@ -1,0 +1,68 @@
+name: task_manager_app
+description: A professional Flutter Task Manager with Firebase
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Firebase
+  firebase_core: ^3.12.1
+  firebase_auth: ^5.5.1
+  cloud_firestore: ^5.6.5
+  firebase_messaging: ^15.1.6
+  cloud_functions: ^5.1.0
+
+  google_sign_in: ^6.3.0  # Use ^, not exact version
+  
+  # UI
+  google_fonts: ^6.2.1
+  flutter_slidable: ^4.0.0
+  
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+  
+  # Utilities
+  intl: ^0.20.2
+  provider: ^6.1.2
+  equatable: ^2.0.7
+  shared_preferences: ^2.3.2
+  permission_handler: ^11.3.1
+
+  #http
+  http: ^1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/icons/google.png
+    - assets/icons/1024.png
+    - assets/avatars/avatar1.png
+    - assets/avatars/avatar2.png
+    - assets/avatars/avatar3.png
+    - assets/app-icon/icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app-icon/icon.png"
+  remove_alpha_ios: true
+  min_sdk_android: 21
+
+# Remove this entire section - NO overrides!
+# dependency_overrides:
+#   google_sign_in: 6.3.0
+#   google_sign_in_android: 6.1.22
+#   google_sign_in_ios: 6.1.22
+#   google_sign_in_web: 0.12.2

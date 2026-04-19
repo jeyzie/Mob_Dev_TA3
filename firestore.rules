@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Tasks collection - users can only access their own tasks
+    match /tasks/{taskId} {
+      // Allow read/write if the user is authenticated and owns the task
+      allow read, write: if request.auth != null &&
+        request.auth.uid == resource.data.userId;
+
+      // Allow create if the user is authenticated and the task belongs to them
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.userId;
+    }
+
+    // Users collection - users can read/write their own profile including FCM token
+    match /users/{userId} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid == userId;
+    }
+  }
+}
