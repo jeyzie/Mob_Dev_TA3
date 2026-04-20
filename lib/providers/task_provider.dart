@@ -117,32 +117,66 @@ class TaskProvider extends ChangeNotifier {
       if (timeUntilDue.inMinutes > 1) { // Allow reminders for tasks due in more than 1 minute
         DateTime reminderTime;
         String reminderMessage;
+        int reminderMinutesBefore;
 
         if (timeUntilDue.inMinutes <= 5) {
-          // For tasks due in 2-5 minutes, remind 1 minute before
-          reminderTime = dueDate.subtract(const Duration(minutes: 1));
-          reminderMessage = 'URGENT: "${task.title}" is due in 1 minute!';
+          // For tasks due in 2-5 minutes, send URGENT notification immediately
+          reminderMessage = '🚨 URGENT: "${task.title}" is due in ${timeUntilDue.inMinutes} minutes!';
+          await _notificationService.showLocalNotification(
+            title: 'URGENT Task Reminder',
+            body: reminderMessage,
+          );
+          
+          // Also schedule another URGENT notification 1 minute before due time
+          reminderMinutesBefore = 1;
+          reminderTime = dueDate.subtract(Duration(minutes: reminderMinutesBefore));
+          if (reminderTime.isAfter(now)) {
+            await _notificationService.scheduleDueNotification(
+              id: task.id.hashCode + 1,
+              title: 'URGENT - Task Due Soon!',
+              body: '🚨 URGENT: "${task.title}" is due in 1 minute!',
+              scheduledDate: reminderTime,
+            );
+          }
         } else if (timeUntilDue.inMinutes <= 15) {
           // For tasks due in 6-15 minutes, remind 2 minutes before
-          reminderTime = dueDate.subtract(const Duration(minutes: 2));
-          reminderMessage = 'Reminder: "${task.title}" is due in ${timeUntilDue.inMinutes} minutes';
+          reminderMinutesBefore = 2;
+          reminderTime = dueDate.subtract(Duration(minutes: reminderMinutesBefore));
+          reminderMessage = 'Reminder: "${task.title}" is due in $reminderMinutesBefore minutes';
+          if (reminderTime.isAfter(now)) {
+            await _notificationService.scheduleDueNotification(
+              id: task.id.hashCode + 1,
+              title: 'Task Reminder',
+              body: reminderMessage,
+              scheduledDate: reminderTime,
+            );
+          }
         } else if (timeUntilDue.inMinutes <= 60) {
           // For tasks due in 16-60 minutes, remind 5 minutes before
-          reminderTime = dueDate.subtract(const Duration(minutes: 5));
-          reminderMessage = 'Reminder: "${task.title}" is due in ${timeUntilDue.inMinutes} minutes';
+          reminderMinutesBefore = 5;
+          reminderTime = dueDate.subtract(Duration(minutes: reminderMinutesBefore));
+          reminderMessage = 'Reminder: "${task.title}" is due in $reminderMinutesBefore minutes';
+          if (reminderTime.isAfter(now)) {
+            await _notificationService.scheduleDueNotification(
+              id: task.id.hashCode + 1,
+              title: 'Task Reminder',
+              body: reminderMessage,
+              scheduledDate: reminderTime,
+            );
+          }
         } else {
-          // For tasks due in more than 1 hour, remind 15 minutes before (original logic)
-          reminderTime = dueDate.subtract(const Duration(minutes: 15));
+          // For tasks due in more than 1 hour, remind 15 minutes before
+          reminderMinutesBefore = 15;
+          reminderTime = dueDate.subtract(Duration(minutes: reminderMinutesBefore));
           reminderMessage = 'Reminder: "${task.title}" is due in 15 minutes';
-        }
-
-        if (reminderTime.isAfter(now)) {
-          await _notificationService.scheduleDueNotification(
-            id: task.id.hashCode + 1, // Different ID for reminder
-            title: 'Task Reminder',
-            body: reminderMessage,
-            scheduledDate: reminderTime,
-          );
+          if (reminderTime.isAfter(now)) {
+            await _notificationService.scheduleDueNotification(
+              id: task.id.hashCode + 1,
+              title: 'Task Reminder',
+              body: reminderMessage,
+              scheduledDate: reminderTime,
+            );
+          }
         }
       }
     }

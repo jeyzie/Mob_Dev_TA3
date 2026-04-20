@@ -10,6 +10,11 @@ import 'package:task_manager_app/screens/main_screen.dart';
 import 'package:task_manager_app/constants/app_colors.dart';
 import 'package:task_manager_app/services/notification_service.dart';
 
+Future<User?> _checkAuthState() async {
+  // Check if user is already logged in
+  return FirebaseAuth.instance.currentUser;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -78,16 +83,20 @@ class MyApp extends StatelessWidget {
             home: StreamBuilder<User?>(
               stream: FirebaseAuth.instance.authStateChanges(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.active) {
-                  final user = snapshot.data;
-                  if (user == null) {
-                    return const LoginScreen();
-                  }
-                  return const MainScreen(); // user is signed in
+                // Connection state check
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
                 }
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
+                
+                // Check if user is logged in
+                if (snapshot.hasData && snapshot.data != null) {
+                  return const MainScreen();
+                }
+                
+                // Default to login screen
+                return const LoginScreen();
               },
             ),
           );
