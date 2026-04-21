@@ -77,6 +77,25 @@ class TaskProvider extends ChangeNotifier {
 
   TaskProvider() {
     _startOverdueMonitoring();
+    _rescheduleNotifications(); // Reschedule notifications on app start
+  }
+
+  Future<void> _rescheduleNotifications() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 500)); // Small delay to ensure everything is initialized
+      await loadTasks();
+      
+      // Reschedule all upcoming task notifications
+      final now = DateTime.now();
+      for (final task in _tasks) {
+        if (!task.isCompleted && task.dueDate != null && task.dueDate!.isAfter(now)) {
+          await _scheduleTaskNotifications(task, task.dueDate!);
+        }
+      }
+      print('Rescheduled ${_tasks.length} task notifications on app startup');
+    } catch (e) {
+      print('Error rescheduling notifications: $e');
+    }
   }
 
   Future<void> _scheduleTaskNotifications(Task task, DateTime dueDate) async {

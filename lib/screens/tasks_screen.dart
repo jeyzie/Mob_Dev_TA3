@@ -52,41 +52,71 @@ class _TasksScreenState extends State<TasksScreen> {
     }
   }
 
+  Future<void> _refreshTasks() async {
+    // Trigger a manual refresh by forcing a rebuild
+    if (mounted) {
+      setState(() {});
+      // Also refresh the task provider data
+      await Provider.of<TaskProvider>(context, listen: false).loadTasks();
+    }
+  }
+
   Future<void> _showDeleteDialog(BuildContext context, Task task) async {
     final theme = Theme.of(context);
+    bool isDeleting = false;
+
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Task'),
-        content: Text('Are you sure you want to delete "${task.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: theme.textTheme.bodyMedium?.color)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await FirebaseFirestore.instance.collection('tasks').doc(task.id).delete();
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Task deleted successfully'), backgroundColor: AppColors.success),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting task: $e'), backgroundColor: AppColors.error),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Delete'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Delete Task'),
+          content: isDeleting
+            ? const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Deleting...'),
+                ],
+              )
+            : Text('Are you sure you want to delete "${task.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: isDeleting ? null : () => Navigator.pop(context),
+              child: Text('Cancel', style: TextStyle(color: theme.textTheme.bodyMedium?.color)),
+            ),
+            ElevatedButton(
+              onPressed: isDeleting
+                ? null
+                : () async {
+                    setState(() => isDeleting = true);
+                    try {
+                      await FirebaseFirestore.instance.collection('tasks').doc(task.id).delete();
+                      if (mounted) {
+                        Navigator.pop(dialogContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Task deleted successfully'), backgroundColor: AppColors.success),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        setState(() => isDeleting = false);
+                        Navigator.pop(dialogContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error deleting task: $e'), backgroundColor: AppColors.error),
+                        );
+                      }
+                    }
+                  },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                disabledBackgroundColor: AppColors.error.withOpacity(0.5),
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -156,6 +186,13 @@ class _TasksScreenState extends State<TasksScreen> {
               var tasks = snapshot.data!.docs
                   .map((doc) => Task.fromMap(doc.id, doc.data() as Map<String, dynamic>))
                   .where((task) {
+                    // Exclude overdue tasks from home screen
+                    if (!task.isCompleted && task.dueDate != null) {
+                      if (task.dueDate!.isBefore(DateTime.now())) {
+                        return false; // Skip overdue tasks
+                      }
+                    }
+
                     if (_filter == 'Active') return !task.isCompleted;
                     if (_filter == 'Completed') return task.isCompleted;
                     return true;
@@ -163,48 +200,62 @@ class _TasksScreenState extends State<TasksScreen> {
                   .toList();
 
               if (tasks.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.task_alt, size: 80, color: mutedTextColor),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No tasks found',
-                        style: AppStyles.heading3.copyWith(color: mutedTextColor),
+                return RefreshIndicator(
+                  onRefresh: _refreshTasks,
+                  color: AppColors.primary,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.6,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.task_alt, size: 80, color: mutedTextColor),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No tasks found',
+                              style: AppStyles.heading3.copyWith(color: mutedTextColor),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _filter == 'All'
+                                  ? 'Tap + to add a new task'
+                                  : 'No $_filter tasks',
+                              style: AppStyles.bodyText2.copyWith(color: mutedTextColor),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _filter == 'All'
-                            ? 'Tap + to add a new task'
-                            : 'No $_filter tasks',
-                        style: AppStyles.bodyText2.copyWith(color: mutedTextColor),
-                      ),
-                    ],
+                    ),
                   ),
                 );
               }
 
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: tasks.length,
-                itemBuilder: (context, index) {
-                  final task = tasks[index];
-                  return TaskCard(
-                    task: task,
-                    onEdit: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => AddEditTaskScreen(task: task)),
-                      );
-                      if (result == true && mounted) {
-                        Provider.of<TaskProvider>(context, listen: false).loadTasks();
-                      }
-                    },
-                    onDelete: () => _showDeleteDialog(context, task),
-                    onToggle: (value) => _toggleTaskStatus(task, value ?? false),
-                  );
-                },
+              return RefreshIndicator(
+                onRefresh: _refreshTasks,
+                color: AppColors.primary,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = tasks[index];
+                    return TaskCard(
+                      task: task,
+                      onEdit: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => AddEditTaskScreen(task: task)),
+                        );
+                        if (result == true && mounted) {
+                          Provider.of<TaskProvider>(context, listen: false).loadTasks();
+                        }
+                      },
+                      onDelete: () => _showDeleteDialog(context, task),
+                      onToggle: (value) => _toggleTaskStatus(task, value ?? false),
+                    );
+                  },
+                ),
               );
             },
           ),

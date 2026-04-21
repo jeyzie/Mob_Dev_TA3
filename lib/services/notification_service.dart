@@ -171,7 +171,18 @@ class NotificationService {
     required DateTime scheduledDate,
   }) async {
     try {
-      final tz.TZDateTime scheduledTZDate = tz.TZDateTime.from(scheduledDate, tz.local);
+      // Ensure the scheduled date is in the future
+      final now = DateTime.now();
+      if (scheduledDate.isBefore(now)) {
+        print('Warning: Scheduled date is in the past, showing notification immediately instead');
+        await showLocalNotification(
+          title: title,
+          body: '$body (Due now)',
+        );
+        return;
+      }
+
+      final scheduledTZDate = tz.TZDateTime.from(scheduledDate, tz.local);
 
       const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
         'due_notifications',
@@ -179,10 +190,14 @@ class NotificationService {
         channelDescription: 'Notifications for task due dates',
         importance: Importance.high,
         priority: Priority.high,
+        enableVibration: true,
+        playSound: true,
+        fullScreenIntent: true,
       );
 
       const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
         sound: 'default.wav',
+        threadIdentifier: 'due_notification_thread',
       );
 
       const NotificationDetails details = NotificationDetails(
@@ -203,10 +218,11 @@ class NotificationService {
           details,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.dateAndTime,
         );
-        print('Scheduled exact notification for task $id at $scheduledDate');
+        print('Scheduled exact notification for task $id at $scheduledDate (${scheduledTZDate})');
       } else {
-        // Fallback to inexact scheduling
+        // Fallback to inexact scheduling (which is more reliable when exact permissions aren't available)
         await _localNotifications.zonedSchedule(
           id,
           title,
@@ -215,8 +231,9 @@ class NotificationService {
           details,
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.dateAndTime,
         );
-        print('Scheduled inexact notification for task $id at $scheduledDate (exact alarms not permitted)');
+        print('Scheduled inexact notification for task $id at $scheduledDate (exact alarms not permitted, falling back to inexact)');
       }
     } catch (e) {
       print('Error scheduling notification: $e');
@@ -233,11 +250,42 @@ class NotificationService {
   }
 
   Future<void> cancelNotification(int id) async {
-    await _localNotifications.cancel(id);
+    try {
+      await _localNotifications.cancel(id);
+      print('Cancelled notification $id');
+    } catch (e) {
+      print('Error cancelling notification $id: $e');
+    }
   }
 
   Future<void> cancelAllNotifications() async {
-    await _localNotifications.cancelAll();
+    try {
+      await _localNotifications.cancelAll();
+      print('Cancelled all notifications');
+    } catch (e) {
+      print('Error cancelling all notifications: $e');
+    }
+  }
+
+  // Reschedule all pending notifications (useful after app restart or on boot)
+  Future<void> reschedulePendingNotifications(List<Map<String, dynamic>> pendingNotifications) async {
+    try {
+      print('Rescheduling ${pendingNotifications.length} pending notifications...');
+      for (final notification in pendingNotifications) {
+        try {
+          await scheduleDueNotification(
+            id: notification['id'] as int,
+            title: notification['title'] as String,
+            body: notification['body'] as String,
+            scheduledDate: notification['scheduledDate'] as DateTime,
+          );
+        } catch (e) {
+          print('Error rescheduling notification ${notification['id']}: $e');
+        }
+      }
+    } catch (e) {
+      print('Error rescheduling pending notifications: $e');
+    }
   }
 
   // Send push notification to current user

@@ -157,6 +157,25 @@ class _MainScreenState extends State<MainScreen> {
                         ],
                       ),
                     ),
+                    // Add refresh button for Tasks screen
+                    if (_selectedIndex == 0)
+                      IconButton(
+                        onPressed: () async {
+                          // Trigger refresh by reloading tasks
+                          await Provider.of<TaskProvider>(context, listen: false).loadTasks();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Tasks refreshed'),
+                                duration: Duration(seconds: 1),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.refresh),
+                        tooltip: 'Refresh tasks',
+                        color: textColor.withOpacity(0.7),
+                      ),
                   ],
                 ),
               ),
