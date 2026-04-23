@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 
 class QuoteService {
   static Future<String> fetchMotivationalQuote() async {
-    // Try ZenQuotes with a short timeout
     try {
       final client = http.Client();
       final response = await client
@@ -23,7 +22,6 @@ class QuoteService {
       }
     } catch (_) {}
 
-    // Fallback to Quotable with a short timeout
     try {
       final client = http.Client();
       final response = await client
@@ -42,7 +40,6 @@ class QuoteService {
       }
     } catch (_) {}
 
-    // Fast local fallback (no wait)
     const fallbackQuotes = [
       'Stay motivated! Keep going! 💪',
       'Believe you can and you’re halfway there. — Theodore Roosevelt',
